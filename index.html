@@ -552,56 +552,82 @@ async function syncRegistosFromDrive() {
     const data = await r.json();
     const folders = data.files || [];
     const driveIds = [];
-    console.log('[Sync] Encontradas', folders.length, 'pastas de trolleys');
+    console.log('[Sync] Encontradas', folders.length, 'pastas de trolleys:', folders.map(f => f.name).join(', '));
 
     let synced = 0;
+    let failed = 0;
     for (const folder of folders) {
       const trolleyId = folder.name;
       
       try {
+        // Procurar metadata.json nesta pasta
         const mq = encodeURIComponent(`'${folder.id}' in parents and name='metadata.json' and trashed=false`);
         const mr = await fetch(`https://www.googleapis.com/drive/v3/files?q=${mq}&fields=files(id)`,
           {headers:{Authorization:'Bearer '+tok}});
-        if (!mr.ok) continue;
+        if (!mr.ok) {
+          console.log('[Sync] Erro ao procurar metadata.json em', trolleyId, ':', mr.status);
+          failed++;
+          continue;
+        }
         const md = await mr.json();
-        if (!md.files || !md.files.length) continue;
+        if (!md.files || !md.files.length) {
+          console.log('[Sync] Nenhum metadata.json encontrado em', trolleyId);
+          failed++;
+          continue;
+        }
 
         const fileId = md.files[0].id;
         const fr = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
           {headers:{Authorization:'Bearer '+tok}});
-        if (!fr.ok) continue;
+        if (!fr.ok) {
+          console.log('[Sync] Erro ao descarregar metadata.json de', trolleyId, ':', fr.status);
+          failed++;
+          continue;
+        }
         const metadata = await fr.json();
         
-        if (!metadata || !metadata.id || !metadata.steps) continue;
+        if (!metadata || !metadata.id) {
+          console.log('[Sync] Metadata inválida ou incompleta para', trolleyId);
+          failed++;
+          continue;
+        }
+        // Se steps não existe, criar vazio
+        if (!metadata.steps) {
+          metadata.steps = {};
+        }
         driveIds.push(trolleyId);
         
         // Verificar se já existe localmente
         const existsLocally = !!db[trolleyId];
-        const isNewer = !existsLocally || new Date(metadata.updatedAt) > new Date(db[trolleyId].updatedAt);
+        const isNewer = !existsLocally || new Date(metadata.updatedAt || 0) > new Date((db[trolleyId].updatedAt || 0));
         
         if (existsLocally && !isNewer) {
           console.log('[Sync] Registo', trolleyId, 'já atualizado localmente');
+          synced++;
           continue;
         }
         
         // Criar ou atualizar registo com metadata
         db[trolleyId] = {
-          id: metadata.id,
-          createdAt: metadata.createdAt,
-          updatedAt: metadata.updatedAt,
+          id: metadata.id || trolleyId,
+          createdAt: metadata.createdAt || new Date().toISOString(),
+          updatedAt: metadata.updatedAt || new Date().toISOString(),
           steps: {}
         };
         
         // Para cada step, descarregar as imagens do Drive
-        for (const [stepId, stepData] of Object.entries(metadata.steps)) {
+        const steps = metadata.steps || {};
+        for (const [stepId, stepData] of Object.entries(steps)) {
+          if (!stepData) continue;
           db[trolleyId].steps[stepId] = {
             photos: [],
             notes: stepData.notes || ''
           };
           
           // Descarregar cada imagem do Drive
-          for (const photo of stepData.photos) {
-            if (photo.fid && photo.link) {
+          const photos = stepData.photos || [];
+          for (const photo of photos) {
+            if (photo && photo.fid && photo.link) {
               try {
                 console.log('[Sync] Descarregando imagem:', photo.fid);
                 const imgResp = await fetch(`https://www.googleapis.com/drive/v3/files/${photo.fid}?alt=media`,
@@ -641,14 +667,38 @@ async function syncRegistosFromDrive() {
         console.log('[Sync]', existsLocally ? 'Registo atualizado:' : 'Registo sincronizado:', trolleyId);
         synced++;
       } catch(err) {
-        console.log('[Sync] Erro ao sincronizar', trolleyId, ':', err);
+        console.log('[Sync] Erro ao sincronizar', trolleyId, ':', err.message);
+        // Se temos folder ID mas erro ao processar metadata, criar record vazio para mostrar folder
+        if (folder.id && folder.name) {
+          try {
+            if (!db[trolleyId]) {
+              db[trolleyId] = {
+                id: trolleyId,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                steps: {}
+              };
+              synced++;
+              console.log('[Sync] Registo criado vazio para:', trolleyId);
+            }
+          } catch(e) {
+            console.log('[Sync] Falha ao criar record vazio para', trolleyId, ':', e);
+            failed++;
+          }
+        } else {
+          failed++;
+        }
       }
     }
     
     
     if (synced > 0) {
-      showToast(`✅ ${synced} registo${synced>1?'s':''} sincronizado${synced>1?'s':''} do Drive!`);
+      const msg = `✅ ${synced} registo${synced>1?'s':''} sincronizado${synced>1?'s':''} do Drive!${failed > 0 ? ` ⚠️ ${failed} com erro` : ''}`;
+      showToast(msg);
       renderHist();
+    } else if (failed > 0) {
+      showToast(`⚠️ ${failed} registo${failed>1?'s':''} com erro`);
+      console.warn('[Sync] Registos falhados:', failed);
     } else {
       showToast('✅ Tudo sincronizado');
       renderHist();

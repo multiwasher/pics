@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trolley Check">
-<meta name="app-version" content="1.2.1">
+<meta name="app-version" content="1.2.2">
 <title>SOMENGIL · Trolley Check</title>
 <link rel="icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
 <link rel="apple-touch-icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
@@ -218,6 +218,31 @@ body::before{display:none;}
 
 <div class="toast" id="toast"></div>
 
+<div class="modal" id="installModal" style="display:none;position:fixed;inset:0;z-index:999;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:20px">
+  <div style="background:#fff;border-radius:20px;padding:28px;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.3);position:relative">
+    <button onclick="closeInstallModal()" style="position:absolute;top:12px;right:12px;background:none;border:none;font-size:24px;cursor:pointer;color:#999">✕</button>
+    
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:56px;margin-bottom:12px">📱</div>
+      <h2 style="font-size:20px;font-weight:700;color:#1a2744;margin:0 0 8px">Instalar App</h2>
+      <p style="font-size:14px;color:#666;margin:0">Acesso rápido no seu telemóvel</p>
+    </div>
+    
+    <div style="background:#f5f7ff;border-radius:12px;padding:16px;margin-bottom:20px;font-size:13px;color:#4a5580;line-height:1.6">
+      <strong>iOS:</strong> Toca em Partilhar → Adicionar ao ecrã inicial<br><br>
+      <strong>Android:</strong> Toca no menu ⋮ → "Instalar app" ou "Adicionar a ecrã inicial"
+    </div>
+    
+    <button onclick="navigator.share&&navigator.share({title:'SOMENGIL Trolley Check',text:'App de registo de trolleys',url:window.location.href})||alert('App já otimizada para instalação')" style="width:100%;padding:14px;background:linear-gradient(135deg,#2d5be3,#4a7aff);color:#fff;border:none;border-radius:12px;font-weight:600;font-family:DM Sans;cursor:pointer;margin-bottom:10px">
+      🔗 Partilhar
+    </button>
+    
+    <button onclick="closeInstallModal()" style="width:100%;padding:14px;background:#f0f2f8;color:#4a5580;border:none;border-radius:12px;font-weight:600;font-family:DM Sans;cursor:pointer">
+      Fechar
+    </button>
+  </div>
+</div>
+
 <!-- ══ HOME ══ -->
 <div class="screen active" id="s-home">
   <div class="app-header">
@@ -226,6 +251,7 @@ body::before{display:none;}
       <div><div class="brand-name">SOMENGIL</div><div class="brand-sub">Trolley Check</div></div>
     </div>
     <button class="hbtn" onclick="goHist()">📋</button>
+    <button class="hbtn" onclick="openInstallModal()" style="margin-left:8px">ⓘ</button>
   </div>
 
   <div class="auth-bar">
@@ -326,7 +352,7 @@ body::before{display:none;}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-const APP_VERSION = '1.2.1';
+const APP_VERSION = '1.2.2';
 const BUILD_TIME = '2026-04-15T' + new Date().toISOString().split('T')[1];
 const CLIENT_ID = '836439172538-sed9nvmstv49883qatiqjkm3g41u1kqi.apps.googleusercontent.com';
 const SCOPE     = 'https://www.googleapis.com/auth/drive';
@@ -1103,6 +1129,10 @@ function openLb(src,link){
 }
 function closeLb(){ document.getElementById('lb').classList.remove('open'); }
 document.getElementById('lb').addEventListener('click',e=>{ if(e.target===document.getElementById('lb')) closeLb(); });
+
+function openInstallModal(){ document.getElementById('installModal').style.display='flex'; }
+function closeInstallModal(){ document.getElementById('installModal').style.display='none'; }
+document.getElementById('installModal').addEventListener('click',e=>{ if(e.target===document.getElementById('installModal')) closeInstallModal(); });
 
 // ══════════════════════════════════════════
 // UTILS

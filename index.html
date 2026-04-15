@@ -326,6 +326,7 @@ body::before{display:none;}
       <div class="brand-logo"><img src="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png" alt="SOMENGIL"></div>
       <div><div class="brand-name">Histórico</div><div class="brand-sub">Todos os registos</div></div>
     </div>
+    <button class="hbtn" onclick="syncRegistosFromDrive()" id="syncHistBtn" title="Sincronizar com Drive">🔄</button>
     <button class="hbtn" onclick="goHome()">🏠</button>
   </div>
   <div class="search-bar">
@@ -513,6 +514,8 @@ function updateAuthUI(u) {
 // SINCRONIZAÇÃO DE REGISTOS DO DRIVE
 // ══════════════════════════════════════════
 async function syncRegistosFromDrive() {
+  const btn = document.getElementById('syncHistBtn');
+  
   // Se não há token, tentar renovar silenciosamente
   if (!tok) {
     if (localStorage.getItem('userAuthed') === 'true') {
@@ -525,6 +528,9 @@ async function syncRegistosFromDrive() {
       return;
     }
   }
+
+  // Mostrar loading no botão
+  if (btn) btn.textContent = '⏳';
 
   console.log('[Sync] Iniciando sincronização de registos...');
   showToast('⏳ A sincronizar registos...');
@@ -650,6 +656,9 @@ async function syncRegistosFromDrive() {
   } catch(err) {
     console.error('[Sync] Erro geral:', err);
     showToast('❌ Erro na sincronização');
+  } finally {
+    const btn = document.getElementById('syncHistBtn');
+    if (btn) btn.textContent = '🔄';
   }
 }
 

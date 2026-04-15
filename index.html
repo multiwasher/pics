@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trolley Check">
-<meta name="app-version" content="1.2.7">
+<meta name="app-version" content="1.2.8">
 <title>SOMENGIL · Trolley Check</title>
 <link rel="icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
 <link rel="apple-touch-icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
@@ -196,6 +196,13 @@ body::before{display:none;}
 .upl-lbl{font-size:15px;color:rgba(255,255,255,.8);font-weight:500;}
 .upl-sub{font-size:13px;color:rgba(255,255,255,.5);}
 
+/* LOADING OVERLAY */
+.loading-ov{display:none;position:fixed;inset:0;z-index:999;background:rgba(26,39,68,.92);backdrop-filter:blur(12px);align-items:center;justify-content:center;flex-direction:column;gap:20px;}
+.loading-ov.show{display:flex;}
+.loading-logo{width:64px;height:64px;animation:spin-logo 1.2s linear infinite;}
+@keyframes spin-logo{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+.loading-text{font-size:14px;color:rgba(255,255,255,.7);font-weight:500;}
+
 /* EMPTY */
 .empty{padding:38px 18px;text-align:center;color:rgba(255,255,255,.38);}
 .empty .ei{font-size:44px;margin-bottom:10px;}
@@ -214,6 +221,11 @@ body::before{display:none;}
   <div class="spinner"></div>
   <div class="upl-lbl" id="uplLbl">A enviar para Google Drive...</div>
   <div class="upl-sub" id="uplSub"></div>
+</div>
+
+<div class="loading-ov" id="loadingOv">
+  <img src="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png" alt="Loading" class="loading-logo">
+  <div class="loading-text" id="loadingText">A carregar...</div>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -353,7 +365,7 @@ body::before{display:none;}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-const APP_VERSION = '1.2.7';
+const APP_VERSION = '1.2.8';
 const BUILD_TIME = '2026-04-15T' + new Date().toISOString().split('T')[1];
 const CLIENT_ID = '836439172538-sed9nvmstv49883qatiqjkm3g41u1kqi.apps.googleusercontent.com';
 const SCOPE     = 'https://www.googleapis.com/auth/drive';
@@ -452,6 +464,7 @@ function initAuth() {
 
 function onToken(resp) {
   if (resp.error || !resp.access_token) {
+    hideLoading();
     showToast('❌ Erro ao autenticar: ' + (resp.error || 'sem token'));
     return;
   }
@@ -474,13 +487,15 @@ function onToken(resp) {
     window._pendingSync = false;
     syncRegistosFromDrive();
   } else {
+    hideLoading();
     syncRegistosFromDrive();
   }
 }
 
-function signIn()  { tc.requestAccessToken(); }
+function signIn()  { showLoading('A ligar ao Google...'); tc.requestAccessToken(); }
 function renewToken() {
   console.log('[Auth] Renovando token...');
+  showLoading('A autenticar com Google...');
   window._pendingSync = true;
   const tcRenew = google.accounts.oauth2.initTokenClient({
     client_id: CLIENT_ID,
@@ -531,6 +546,7 @@ async function syncRegistosFromDrive() {
 
   // Mostrar loading no botão
   if (btn) btn.textContent = '⏳';
+  showLoading('A sincronizar registos...');
 
   console.log('[Sync] Iniciando sincronização de registos...');
   showToast('⏳ A sincronizar registos...');
@@ -707,6 +723,7 @@ async function syncRegistosFromDrive() {
     console.error('[Sync] Erro geral:', err);
     showToast('❌ Erro na sincronização');
   } finally {
+    hideLoading();
     const btn = document.getElementById('syncHistBtn');
     if (btn) btn.textContent = '🔄';
   }
@@ -1075,6 +1092,7 @@ async function finishReg(){
   btn.innerHTML = '⏳ A guardar...';
   btn.disabled = true;
   btn.style.opacity = '0.75';
+  showLoading('A guardar registo...');
 
   try {
     if (!curId || !db[curId]) {
@@ -1102,8 +1120,10 @@ async function finishReg(){
     btn.innerHTML = '✅ Guardado!';
     btn.style.opacity = '1';
     showToast('✅ Registo guardado!');
+    hideLoading();
     setTimeout(goHome, 900);
   } catch(err) {
+    hideLoading();
     console.error('[FinishReg] Erro geral:', err);
     const errorMsg = err.message || 'Erro ao guardar o registo';
     btn.innerHTML = '❌ Erro!';
@@ -1227,6 +1247,17 @@ async function installApp() {
 // ══════════════════════════════════════════
 function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}); }
 function showToast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2800); }
+function showLoading(msg='A carregar...') { 
+  const ov = document.getElementById('loadingOv'); 
+  if (ov) {
+    document.getElementById('loadingText').textContent = msg;
+    ov.classList.add('show'); 
+  }
+}
+function hideLoading() { 
+  const ov = document.getElementById('loadingOv'); 
+  if (ov) ov.classList.remove('show'); 
+}
 function esc(s){ return (s||'').replace(/'/g,"\\'"); }
 
 // ══════════════════════════════════════════

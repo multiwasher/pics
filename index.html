@@ -228,14 +228,14 @@ body::before{display:none;}
       <p style="font-size:14px;color:#666;margin:0">Acesso rápido no seu telemóvel</p>
     </div>
     
-    <div style="background:#f5f7ff;border-radius:12px;padding:16px;margin-bottom:20px;font-size:13px;color:#4a5580;line-height:1.6">
-      <strong>iOS:</strong> Toca em Partilhar → Adicionar ao ecrã inicial<br><br>
-      <strong>Android:</strong> Toca no menu ⋮ → "Instalar app" ou "Adicionar a ecrã inicial"
+    <div id="installPromptContainer" style="display:none;margin-bottom:20px">
+      <button onclick="installApp()" style="width:100%;padding:14px;background:linear-gradient(135deg,#2d5be3,#4a7aff);color:#fff;border:none;border-radius:12px;font-weight:600;font-family:DM Sans;cursor:pointer;margin-bottom:10px">✓ Instalar Agora</button>
     </div>
     
-    <button onclick="navigator.share&&navigator.share({title:'SOMENGIL Trolley Check',text:'App de registo de trolleys',url:window.location.href})||alert('App já otimizada para instalação')" style="width:100%;padding:14px;background:linear-gradient(135deg,#2d5be3,#4a7aff);color:#fff;border:none;border-radius:12px;font-weight:600;font-family:DM Sans;cursor:pointer;margin-bottom:10px">
-      🔗 Partilhar
-    </button>
+    <div style="background:#f5f7ff;border-radius:12px;padding:16px;margin-bottom:20px;font-size:13px;color:#4a5580;line-height:1.6">
+      <strong>iOS:</strong> Toca em Partilhar → Adicionar ao ecrã inicial<br><br>
+      <strong>Android:</strong> Menu (..ou mais) → "Instalar app"
+    </div>
     
     <button onclick="closeInstallModal()" style="width:100%;padding:14px;background:#f0f2f8;color:#4a5580;border:none;border-radius:12px;font-weight:600;font-family:DM Sans;cursor:pointer">
       Fechar
@@ -1130,9 +1130,28 @@ function openLb(src,link){
 function closeLb(){ document.getElementById('lb').classList.remove('open'); }
 document.getElementById('lb').addEventListener('click',e=>{ if(e.target===document.getElementById('lb')) closeLb(); });
 
-function openInstallModal(){ document.getElementById('installModal').style.display='flex'; }
+function openInstallModal(){
+  document.getElementById('installModal').style.display='flex';
+  // Mostrar botão "Instalar Agora" apenas se deferredPrompt estiver disponível
+  const container = document.getElementById('installPromptContainer');
+  if (window.deferredPrompt) {
+    container.style.display='block';
+  } else {
+    container.style.display='none';
+  }
+}
 function closeInstallModal(){ document.getElementById('installModal').style.display='none'; }
 document.getElementById('installModal').addEventListener('click',e=>{ if(e.target===document.getElementById('installModal')) closeInstallModal(); });
+
+async function installApp() {
+  if (!window.deferredPrompt) return;
+  window.deferredPrompt.prompt();
+  const {outcome} = await window.deferredPrompt.userChoice;
+  if (outcome === 'accepted') {
+    closeInstallModal();
+    window.deferredPrompt = null;
+  }
+}
 
 // ══════════════════════════════════════════
 // UTILS
@@ -1193,36 +1212,12 @@ if ('serviceWorker' in navigator) {
 }
 
 // Show install prompt when available
-let deferredPrompt = null;
+window.deferredPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
-  deferredPrompt = e;
-  showInstallBtn();
+  window.deferredPrompt = e;
 });
-window.addEventListener('appinstalled', () => { hideInstallBtn(); deferredPrompt = null; });
-
-function showInstallBtn() {
-  let btn = document.getElementById('installBtn');
-  if (!btn) {
-    btn = document.createElement('button');
-    btn.id = 'installBtn';
-    btn.innerHTML = '📲 Instalar App';
-    btn.style.cssText = 'position:fixed;bottom:80px;right:16px;z-index:9999;background:linear-gradient(135deg,#2d5be3,#4a7aff);color:#fff;border:none;border-radius:12px;padding:10px 18px;font-family:DM Sans,sans-serif;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(45,91,227,.4);cursor:pointer;';
-    btn.onclick = async () => {
-      if (!deferredPrompt) return;
-      deferredPrompt.prompt();
-      const {outcome} = await deferredPrompt.userChoice;
-      if (outcome === 'accepted') hideInstallBtn();
-      deferredPrompt = null;
-    };
-    document.body.appendChild(btn);
-  }
-  btn.style.display = 'block';
-}
-function hideInstallBtn() {
-  const btn = document.getElementById('installBtn');
-  if (btn) btn.style.display = 'none';
-}
+window.addEventListener('appinstalled', () => { window.deferredPrompt = null; });
 </script>
 </body>
 </html>

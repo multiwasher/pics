@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trolley Check">
-<meta name="app-version" content="1.2.3">
+<meta name="app-version" content="1.2.4">
 <title>SOMENGIL · Trolley Check</title>
 <link rel="icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
 <link rel="apple-touch-icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
@@ -352,7 +352,7 @@ body::before{display:none;}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-const APP_VERSION = '1.2.3';
+const APP_VERSION = '1.2.4';
 const BUILD_TIME = '2026-04-15T' + new Date().toISOString().split('T')[1];
 const CLIENT_ID = '836439172538-sed9nvmstv49883qatiqjkm3g41u1kqi.apps.googleusercontent.com';
 const SCOPE     = 'https://www.googleapis.com/auth/drive';
@@ -1132,25 +1132,15 @@ document.getElementById('lb').addEventListener('click',e=>{ if(e.target===docume
 
 function openInstallModal(){
   document.getElementById('installModal').style.display='flex';
-  // Mostrar botão "Instalar Agora" apenas se deferredPrompt estiver disponível
-  const container = document.getElementById('installPromptContainer');
-  if (window.deferredPrompt) {
-    container.style.display='block';
-  } else {
-    container.style.display='none';
-  }
+  // Botão "Instalar Agora" está sempre escondido (pop-up automático removido)
+  document.getElementById('installPromptContainer').style.display='none';
 }
 function closeInstallModal(){ document.getElementById('installModal').style.display='none'; }
 document.getElementById('installModal').addEventListener('click',e=>{ if(e.target===document.getElementById('installModal')) closeInstallModal(); });
 
 async function installApp() {
-  if (!window.deferredPrompt) return;
-  window.deferredPrompt.prompt();
-  const {outcome} = await window.deferredPrompt.userChoice;
-  if (outcome === 'accepted') {
-    closeInstallModal();
-    window.deferredPrompt = null;
-  }
+  // Pop-up de instalação automático removido
+  showToast('📱 Segue as instruções para instalar a app');
 }
 
 // ══════════════════════════════════════════
@@ -1211,13 +1201,6 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Show install prompt when available
-window.deferredPrompt = null;
-window.addEventListener('beforeinstallprompt', e => {
-  e.preventDefault();
-  window.deferredPrompt = e;
-});
-window.addEventListener('appinstalled', () => { window.deferredPrompt = null; });
 </script>
 </body>
 </html>

@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Trolley Check">
-<meta name="app-version" content="1.2.6">
+<meta name="app-version" content="1.2.7">
 <title>SOMENGIL · Trolley Check</title>
 <link rel="icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
 <link rel="apple-touch-icon" href="https://res.cloudinary.com/dlkkjtgvy/image/upload/v1775600210/%C3%8DCONE_VERS%C3%83O_PRINCIPAL_qoqnjb.png">
@@ -353,7 +353,7 @@ body::before{display:none;}
 // ══════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════
-const APP_VERSION = '1.2.6';
+const APP_VERSION = '1.2.7';
 const BUILD_TIME = '2026-04-15T' + new Date().toISOString().split('T')[1];
 const CLIENT_ID = '836439172538-sed9nvmstv49883qatiqjkm3g41u1kqi.apps.googleusercontent.com';
 const SCOPE     = 'https://www.googleapis.com/auth/drive';
@@ -899,6 +899,15 @@ function startReg(){
   err.classList.remove('show');
   if(!db[id]) newRec(id);
   document.getElementById('tidInput').value='';
+  
+  // Auto-save para Drive se estiver ligado
+  if (tok) {
+    saveMetadataToDrive(id).catch(e => {
+      console.warn('[AutoSave] Erro ao guardar inicial:', e);
+      // Não bloqueia - o user continua a trabalhar
+    });
+  }
+  
   goCap(id);
 }
 
@@ -1045,6 +1054,17 @@ document.getElementById('camInput').addEventListener('change', async function(e)
   document.getElementById('uplOv').classList.remove('show');
   renderCap();
   showToast(ok===files.length?`☁️ ${ok} foto${ok>1?'s':''} no Drive!`:`⚠️ ${ok}/${files.length} enviadas. Ver consola.`);
+  
+  // Auto-save metadata após upload de fotos
+  if (tok) {
+    try {
+      await saveMetadataToDrive(tid);
+      console.log('[AutoSave] Metadata atualizado após upload de fotos');
+    } catch(e) {
+      console.warn('[AutoSave] Erro ao atualizar metadata:', e);
+    }
+  }
+  
   // Sincronizar automaticamente se registo está completo
   autoSyncIfCompleted();
 });

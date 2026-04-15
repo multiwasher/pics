@@ -266,12 +266,6 @@ body::before{display:none;}
     </div>
     <button class="btn btn-p" onclick="startReg()">Iniciar Registo →</button>
     <button class="btn btn-s" onclick="goHist()">📋 Ver Histórico de Registos</button>
-    <button class="btn btn-s" id="syncBtn" style="display:none;background:rgba(0,180,216,.1);color:var(--teal);margin-top:16px" onclick="syncRegistosFromDrive()">🔄 Sincronizar Agora</button>
-  </div>
-
-  <div style="padding:0 16px 32px">
-    <div class="section-lbl">Recentes</div>
-    <div class="hist-list" id="recentList"></div>
   </div>
 </div>
 
@@ -351,7 +345,7 @@ const STEPS = [
 // ══════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════
-let db  = JSON.parse(localStorage.getItem('tcDB') || '{}');
+let db  = {};  // cache em memória, carregado do Drive
 let tok = null;   // access token — NEVER persisted
 let user = null;
 let curId  = null;
@@ -359,46 +353,6 @@ let curStep = 0;
 let camStep = null;
 let tc = null;    // token client
 const fcache = {};
-let driveRegistry = JSON.parse(localStorage.getItem('tcDriveRegistry') || '[]');
-
-function saveDriveRegistry() {
-  driveRegistry = [...new Set((driveRegistry || []).filter(Boolean))];
-  localStorage.setItem('tcDriveRegistry', JSON.stringify(driveRegistry));
-}
-function setDriveRegistry(ids) {
-  driveRegistry = [...new Set((ids || []).filter(Boolean))];
-  saveDriveRegistry();
-}
-function markRegistoNoDrive(id) {
-  if (!id) return;
-  if (!driveRegistry.includes(id)) {
-    driveRegistry.push(id);
-    saveDriveRegistry();
-  }
-}
-function isOnDrive(id) {
-  return driveRegistry.includes(id);
-}
-
-// Migrate old DB keys
-if (localStorage.getItem('trolleyDB') && !Object.keys(db).length) {
-  try {
-    const old = JSON.parse(localStorage.getItem('trolleyDB') || '{}');
-    Object.values(old).forEach(rec => {
-      const steps = {};
-      STEPS.forEach(s => {
-        const photos = (rec.steps?.[s.id]?.photos || []).map(p =>
-          typeof p === 'string' ? {dataUrl:p,fid:null,link:null} : {dataUrl:p.dataUrl||'',fid:p.driveFileId||null,link:p.driveWebViewLink||null}
-        );
-        steps[s.id] = {photos, notes: rec.steps?.[s.id]?.notes || ''};
-      });
-      db[rec.id] = {id:rec.id, createdAt:rec.createdAt, updatedAt:rec.updatedAt, steps};
-    });
-    saveDB();
-  } catch(e) {}
-}
-
-function saveDB() { localStorage.setItem('tcDB', JSON.stringify(db)); }
 
 // IndexedDB para armazenar imagens grandes
 const dbPromise = (function() {
@@ -437,9 +391,9 @@ async function getImageFromIDB(imageId) {
 function newRec(id) {
   const steps = {}; STEPS.forEach(s => { steps[s.id] = {photos:[], notes:''}; });
   db[id] = {id, createdAt:new Date().toISOString(), updatedAt:new Date().toISOString(), steps};
-  saveDB(); return db[id];
+  return db[id];
 }
-function touchRec(id) { if(db[id]){ db[id].updatedAt = new Date().toISOString(); saveDB(); } }
+function touchRec(id) { if(db[id]){ db[id].updatedAt = new Date().toISOString(); } }
 
 // ══════════════════════════════════════════
 // GOOGLE AUTH  — token client only, no cache
@@ -521,7 +475,6 @@ function updateAuthUI(u) {
   document.getElementById('aBtnIn').style.display  = u ? 'none' : 'flex';
   document.getElementById('aBtnOut').style.display = u ? 'block' : 'none';
   document.getElementById('aInfo').style.display   = u ? 'flex' : 'none';
-  document.getElementById('syncBtn').style.display = u ? 'block' : 'none';
   document.getElementById('driveNotice').classList.toggle('show', !u);
   if (u) {
     const av = document.getElementById('aAvatar');
@@ -654,18 +607,15 @@ async function syncRegistosFromDrive() {
         }
         
         console.log('[Sync]', existsLocally ? 'Registo atualizado:' : 'Registo sincronizado:', trolleyId);
-        saveDB();
         synced++;
       } catch(err) {
         console.log('[Sync] Erro ao sincronizar', trolleyId, ':', err);
       }
     }
     
-    setDriveRegistry(driveIds);
-
+    
     if (synced > 0) {
       showToast(`✅ ${synced} registo${synced>1?'s':''} sincronizado${synced>1?'s':''} do Drive!`);
-      renderRecent();
       renderHist();
     } else {
       showToast('✅ Tudo sincronizado');
@@ -732,7 +682,6 @@ async function saveMetadataToDrive(trolleyId) {
       if (ur.status === 401) throw new Error('Token expirado - faça login novamente');
       if (!ur.ok) throw new Error(`Erro ao atualizar metadata (${ur.status})`);
       console.log('[Meta] Metadata atualizada no Drive');
-      markRegistoNoDrive(trolleyId);
     } else {
       // Criar novo ficheiro
       const meta = JSON.stringify({name:'metadata.json',parents:[trolleyFolder]});
@@ -747,7 +696,6 @@ async function saveMetadataToDrive(trolleyId) {
       if (cr.status === 401) throw new Error('Token expirado - faça login novamente');
       if (!cr.ok) throw new Error(`Erro ao criar metadata no Drive (${cr.status})`);
       console.log('[Meta] Metadata criada no Drive');
-      markRegistoNoDrive(trolleyId);
     }
   } catch(err) {
     console.error('[Meta] Erro ao guardar metadata:', err);
@@ -837,20 +785,20 @@ function showScreen(id){
   document.getElementById(id).classList.add('active');
   document.getElementById(id).scrollTop=0;
 }
-function goHome(){ renderRecent(); showScreen('s-home'); }
+function goHome(){ showScreen('s-home'); }
 function goHist(){
   document.getElementById('srchInp').value='';
   renderHist();
   showScreen('s-hist');
   
-  // Tentar sincronizar se há token ou autenticação anterior
+  // Sincronizar sempre que vê o histórico
   if (tok) {
     syncRegistosFromDrive();
   } else if (localStorage.getItem('userAuthed') === 'true') {
     console.log('[goHist] Tentando renovar token para sincronizar...');
     renewToken();
   }
-  // Se não tem nada, a página mostra aviso para fazer login
+  // Se não tem autenticação, a página mostra aviso para fazer login
 }
 function goCap(id){ curId=id; curStep=0; document.getElementById('capTid').textContent=id; renderCap(); showScreen('s-cap'); }
 function goDetail(id){ curId=id; renderDetail(); showScreen('s-detail'); }
@@ -867,20 +815,6 @@ function startReg(){
   if(!db[id]) newRec(id);
   document.getElementById('tidInput').value='';
   goCap(id);
-}
-
-function renderRecent(){
-  const el = document.getElementById('recentList');
-  const recs = Object.values(db).sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt)).slice(0,5);
-  if(!recs.length){ el.innerHTML='<div class="empty"><div class="ei">📋</div><p>Nenhum registo ainda.</p></div>'; return; }
-  el.innerHTML = recs.map(r=>{
-    const st=status(r);
-    return `<div class="hi" onclick="goDetail('${r.id}')">
-      <div class="hi-icon ${st.cls}">${st.icon}</div>
-      <div class="hi-info"><div class="hi-id">${r.id}</div><div class="hi-meta">${fmtDate(r.updatedAt)} · ${st.n} fotos</div></div>
-      <span class="badge ${st.bc}">${st.lbl}</span>
-    </div>`;
-  }).join('');
 }
 
 // ══════════════════════════════════════════
@@ -954,7 +888,6 @@ function switchStep(i){
     const ta = document.querySelector('#stepWrap textarea');
     if(ta && curId && STEPS[curStep]) {
       db[curId].steps[STEPS[curStep].id].notes = ta.value;
-      saveDB();
       autoSyncIfCompleted();
     }
   } catch(e) {}
@@ -1023,7 +956,6 @@ document.getElementById('camInput').addEventListener('change', async function(e)
       console.error('[Drive] Upload error:', err);
       showToast('❌ ' + err.message);
     }
-    saveDB();
   }
   document.getElementById('uplOv').classList.remove('show');
   renderCap();
@@ -1103,7 +1035,6 @@ function renderHist(){
   const q=(document.getElementById('srchInp').value||'').toUpperCase();
   const el=document.getElementById('histFull');
   const recs=Object.values(db)
-    .filter(r=>isOnDrive(r.id))
     .filter(r=>!q||r.id.includes(q))
     .sort((a,b)=>new Date(b.updatedAt)-new Date(a.updatedAt));
   
@@ -1183,7 +1114,6 @@ function esc(s){ return (s||'').replace(/'/g,"\\'"); }
 // ══════════════════════════════════════════
 // INIT
 // ══════════════════════════════════════════
-renderRecent();
 window.addEventListener('load', initAuth);
 
 // ══════════════════════════════════════════
